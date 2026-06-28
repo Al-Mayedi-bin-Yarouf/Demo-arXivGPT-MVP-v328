@@ -1,0 +1,1013 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>arXivGPT MVP v328 — Medical + AI Paper Analyser</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f7f7f4;
+      --panel: #ffffff;
+      --panel-2: #fbfbf8;
+      --ink: #1d1d1f;
+      --muted: #66666b;
+      --line: #deded6;
+      --brand: #111827;
+      --brand-text: #ffffff;
+      --accent: #0f766e;
+      --accent-text: #ffffff;
+      --soft: #eef2f2;
+      --warn: #b45309;
+      --bad: #b91c1c;
+      --good: #047857;
+      --focus: #2563eb;
+      --shadow: 0 18px 40px rgba(0, 0, 0, 0.07);
+      --radius: 24px;
+    }
+
+    [data-theme="dark"] {
+      color-scheme: dark;
+      --bg: #0d0f12;
+      --panel: #151820;
+      --panel-2: #11141a;
+      --ink: #f7f7f4;
+      --muted: #a5acb8;
+      --line: #2a2f3a;
+      --brand: #f7f7f4;
+      --brand-text: #0d0f12;
+      --accent: #5eead4;
+      --accent-text: #061413;
+      --soft: #202733;
+      --focus: #93c5fd;
+      --shadow: 0 18px 40px rgba(0, 0, 0, 0.35);
+    }
+
+    [data-theme="contrast"] {
+      color-scheme: dark;
+      --bg: #000000;
+      --panel: #000000;
+      --panel-2: #050505;
+      --ink: #ffffff;
+      --muted: #ffffff;
+      --line: #ffffff;
+      --brand: #ffffff;
+      --brand-text: #000000;
+      --accent: #ffff00;
+      --accent-text: #000000;
+      --soft: #111111;
+      --focus: #ffff00;
+      --shadow: none;
+    }
+
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+
+    body {
+      margin: 0;
+      overflow: hidden;
+      background:
+        radial-gradient(circle at top left, rgba(15, 118, 110, 0.08), transparent 32rem),
+        var(--bg);
+      color: var(--ink);
+      font: 14px/1.45 ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+    }
+
+    button, input, select, textarea { font: inherit; }
+
+    button {
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 9px 12px;
+      background: var(--panel);
+      color: var(--ink);
+      cursor: pointer;
+      transition: transform 160ms ease, box-shadow 160ms ease, background 160ms ease;
+    }
+
+    button:hover { transform: translateY(-1px); box-shadow: var(--shadow); }
+    button:disabled { cursor: not-allowed; opacity: 0.55; transform: none; box-shadow: none; }
+    button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {
+      outline: 3px solid var(--focus);
+      outline-offset: 2px;
+    }
+
+    .app {
+      display: grid;
+      grid-template-columns: 300px minmax(430px, 1fr) 430px;
+      gap: 12px;
+      height: 100vh;
+      padding: 12px;
+    }
+
+    .panel {
+      min-height: 0;
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--panel);
+      box-shadow: var(--shadow);
+    }
+
+    .side, .chat { display: flex; flex-direction: column; }
+
+    .head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 16px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .logo { font-size: 21px; font-weight: 780; letter-spacing: -0.04em; }
+    .tiny { color: var(--muted); font-size: 12px; }
+    .micro { color: var(--muted); font-size: 11px; }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      white-space: nowrap;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 4px 8px;
+      color: var(--muted);
+      font-size: 11px;
+    }
+
+    .body { flex: 1; min-height: 0; overflow: auto; padding: 14px; }
+    .stack { display: grid; gap: 10px; }
+    .row { display: flex; align-items: center; gap: 8px; }
+    .spread { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+
+    .drop {
+      display: block;
+      border: 1.5px dashed var(--line);
+      border-radius: 20px;
+      padding: 18px;
+      background: var(--soft);
+      color: var(--muted);
+      text-align: center;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .drop.drag {
+      border-color: var(--accent);
+      background: var(--panel-2);
+      color: var(--ink);
+    }
+
+    .drop input { display: none; }
+
+    input, select, textarea {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 10px;
+      background: var(--panel-2);
+      color: var(--ink);
+    }
+
+    textarea { resize: vertical; }
+
+    .paper {
+      margin: 8px 0;
+      padding: 10px;
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: var(--panel-2);
+    }
+
+    .paper.active { outline: 2px solid var(--accent); outline-offset: 2px; }
+    .paper-title { font-weight: 700; word-break: break-word; }
+    .paper button { flex: 1; text-align: left; box-shadow: none; }
+
+    .viewer {
+      display: grid;
+      grid-template-rows: auto auto 1fr;
+      height: 100%;
+    }
+
+    .toolbar, .pdfbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .pdfbar { background: var(--panel-2); padding: 9px 14px; }
+    .pdfbar input { width: 76px; text-align: center; padding: 8px; }
+
+    .viewer-frame {
+      min-height: 0;
+      background: #333;
+    }
+
+    .viewer-frame iframe {
+      width: 100%;
+      height: 100%;
+      border: 0;
+      background: #444;
+    }
+
+    .empty {
+      display: grid;
+      place-items: center;
+      height: 100%;
+      padding: 34px;
+      color: var(--muted);
+      text-align: center;
+    }
+
+    .api { display: grid; grid-template-columns: 1fr auto; gap: 8px; }
+
+    .status { display: inline-flex; align-items: center; gap: 6px; }
+    .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--bad); }
+    .dot.ok { background: var(--good); }
+    .dot.warn { background: var(--warn); }
+
+    .tabs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      padding: 10px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .tab { flex: 1 1 30%; padding: 8px 10px; }
+    .tab.on { background: var(--brand); color: var(--brand-text); }
+
+    .messages {
+      flex: 1;
+      min-height: 0;
+      overflow: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      padding: 14px;
+    }
+
+    .msg {
+      max-width: 94%;
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      padding: 11px 12px;
+      white-space: pre-wrap;
+    }
+
+    .msg.user { align-self: flex-end; background: var(--brand); color: var(--brand-text); }
+    .msg.bot { align-self: flex-start; background: var(--soft); }
+    .msg.system { align-self: stretch; max-width: 100%; background: var(--panel-2); color: var(--muted); }
+
+    .ask {
+      display: grid;
+      gap: 8px;
+      padding: 12px;
+      border-top: 1px solid var(--line);
+    }
+
+    .ask textarea { min-height: 76px; }
+    .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+
+    .primary { background: var(--brand); color: var(--brand-text); }
+    .accent { background: var(--accent); color: var(--accent-text); border-color: var(--accent); font-weight: 800; }
+
+    [data-theme="contrast"] .accent { box-shadow: inset 0 0 0 2px #000; }
+    [data-theme="contrast"] .tab.on,
+    [data-theme="contrast"] .primary,
+    [data-theme="contrast"] .msg.user { background: #fff; color: #000; }
+
+    .warnbox {
+      border: 1px solid var(--warn);
+      border-radius: 14px;
+      padding: 10px;
+      color: var(--muted);
+    }
+
+    .glossary dt { font-weight: 760; margin-top: 10px; }
+    .glossary dd { margin: 2px 0 8px; color: var(--muted); }
+    .refs li, .trace li { margin: 8px 0; }
+    .rtl { direction: rtl; text-align: right; }
+
+    .map-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px; }
+    .map-wrap {
+      min-height: 340px;
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: var(--panel-2);
+      overflow: auto;
+      padding: 10px;
+    }
+
+    .map-svg { width: 100%; min-width: 520px; height: 380px; display: block; }
+    .map-node { fill: var(--panel); stroke: var(--accent); stroke-width: 2; }
+    .map-center { fill: var(--accent); stroke: var(--accent); }
+    .map-text { fill: var(--ink); font-size: 12px; font-weight: 700; }
+    .map-center-text { fill: var(--accent-text); font-size: 13px; font-weight: 800; }
+    .map-edge { stroke: var(--line); stroke-width: 2; }
+
+    @media (max-width: 1180px) {
+      body { overflow: auto; }
+      .app { grid-template-columns: 1fr; height: auto; }
+      .panel { min-height: 390px; }
+      .viewer { height: 78vh; }
+    }
+  </style>
+</head>
+<body data-theme="classic">
+  <div class="app">
+    <aside class="panel side" aria-label="Paper controls">
+      <div class="head">
+        <div>
+          <div class="logo">arXivGPT</div>
+          <div class="tiny">Medicine + Artificial Intelligence</div>
+        </div>
+        <span class="pill">MVP v328</span>
+      </div>
+
+      <div class="body stack">
+        <label class="drop" id="drop" tabindex="0">
+          <input id="fileInput" type="file" accept="application/pdf" multiple />
+          <b>Upload PDFs</b><br />
+          <span class="tiny">Click to browse or drag PDFs here</span>
+        </label>
+
+        <input id="paperSearch" placeholder="Filter uploaded papers…" />
+
+        <div class="spread">
+          <label class="row"><input id="selectAll" type="checkbox" checked /> Select all for chat</label>
+          <button id="clearBtn" title="Remove all uploaded papers">Clear</button>
+        </div>
+
+        <div id="paperList" aria-live="polite"></div>
+
+        <hr style="width: 100%; border: 0; border-top: 1px solid var(--line);" />
+
+        <label for="domain">Domain mode</label>
+        <select id="domain">
+          <option value="MD">Medicine (patient-friendly)</option>
+          <option value="AI" selected>Artificial Intelligence (beginner-friendly)</option>
+        </select>
+
+        <label for="lang">Language</label>
+        <select id="lang">
+          <option>English</option>
+          <option>Arabic</option>
+          <option>French</option>
+          <option>Amharic</option>
+          <option>Chinese</option>
+        </select>
+
+        <label for="theme">Accessibility</label>
+        <select id="theme">
+          <option value="classic">Classic</option>
+          <option value="dark">Dark</option>
+          <option value="contrast">High contrast</option>
+        </select>
+
+        <div class="warnbox tiny">
+          <b>Submission note:</b> this is a single-file MVP. Gemini reads selected PDFs as inline document data; local extraction is only a fallback glimpse.
+        </div>
+      </div>
+    </aside>
+
+    <main class="panel viewer" aria-label="PDF viewer">
+      <div class="toolbar">
+        <div>
+          <b id="viewerTitle">No paper selected</b>
+          <div class="tiny" id="viewerMeta">Upload a PDF to begin</div>
+        </div>
+        <div class="row">
+          <button id="prevPaperBtn" title="Previous paper">‹</button>
+          <button id="nextPaperBtn" title="Next paper">›</button>
+          <button id="summBtn" class="accent">Simplify</button>
+        </div>
+      </div>
+
+      <div class="pdfbar" aria-label="PDF page navigation">
+        <div class="row">
+          <button id="pagePrevBtn" title="Previous PDF page">Page −</button>
+          <label class="row tiny" for="pageNum">Page <input id="pageNum" type="number" min="1" value="1" /></label>
+          <button id="pageNextBtn" title="Next PDF page">Page +</button>
+        </div>
+        <button id="openTabBtn">Open PDF in new tab</button>
+      </div>
+
+      <div id="viewerPane" class="viewer-frame">
+        <div class="empty">
+          <div>
+            <h2>Minimal paper reader</h2>
+            <p>Select a PDF on the left. Page controls use the browser PDF viewer with <code>#page=</code>.</p>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <section class="panel chat" aria-label="Research chat">
+      <div class="head">
+        <div>
+          <b>Gemini Flash 2.5 Chat</b>
+          <div class="status tiny"><span id="statusDot" class="dot"></span><span id="statusText">No API key</span></div>
+        </div>
+        <span class="pill">PDF-native</span>
+      </div>
+
+      <div class="body stack" style="padding-bottom: 8px; flex: 0 0 auto;">
+        <div class="api">
+          <input id="apiKey" type="password" placeholder="Gemini API key" autocomplete="off" />
+          <button id="testKey">Test</button>
+        </div>
+        <input id="copilotEndpoint" placeholder="Optional Copilot/Azure OpenAI fallback endpoint" />
+        <div class="micro" id="requestSize">Selected PDF payload: 0 MB</div>
+      </div>
+
+      <div class="tabs" role="tablist">
+        <button class="tab on" data-tab="chatTab">Chat</button>
+        <button class="tab" data-tab="glossTab">Glossary</button>
+        <button class="tab" data-tab="citeTab">Citations</button>
+        <button class="tab" data-tab="mapTab">Map</button>
+        <button class="tab" data-tab="traceTab">Workflow</button>
+      </div>
+
+      <div id="chatTab" class="messages tabpane"></div>
+
+      <div id="glossTab" class="messages tabpane" style="display: none;">
+        <button id="glossBtn" class="primary">Generate glossary</button>
+        <dl id="glossary" class="glossary"></dl>
+      </div>
+
+      <div id="citeTab" class="messages tabpane" style="display: none;">
+        <button id="citeBtn" class="primary">Track references</button>
+        <ol id="refs" class="refs"></ol>
+      </div>
+
+      <div id="mapTab" class="messages tabpane" style="display: none;">
+        <div class="map-actions">
+          <button id="mapBtn" class="primary">Generate concept map</button>
+          <button id="copyMapBtn">Copy map JSON</button>
+        </div>
+        <div id="mapWrap" class="map-wrap">
+          <p class="tiny">Generate a concept map from the selected or current PDF. This is intentionally lightweight for MVP reliability.</p>
+        </div>
+      </div>
+
+      <div id="traceTab" class="messages tabpane" style="display: none;">
+        <ol id="trace" class="trace"></ol>
+      </div>
+
+      <div class="ask">
+        <select id="demoPrompt">
+          <option value="">Demo prompts…</option>
+          <option>Summarise the selected paper in beginner-friendly language. Include the research question, method, key findings, limitations, and page citations.</option>
+          <option>Compare the selected papers. What do they agree on, where do they differ, and what should a beginner remember?</option>
+          <option>Explain the methods section as if I am new to this field. Cite pages where possible.</option>
+          <option>Extract the limitations and explain why they matter.</option>
+          <option>Generate a patient-friendly or beginner-friendly summary in 70 words or less.</option>
+        </select>
+        <textarea id="question" placeholder="Ask: What did the selected papers find? Cite pages."></textarea>
+        <div class="grid3">
+          <button id="askBtn" class="primary">Ask selected</button>
+          <button id="askCurrentBtn">Ask current</button>
+          <button id="fallbackBtn">General</button>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    const GEMINI_MODEL = 'gemini-2.5-flash';
+    const MAX_INLINE_REQUEST_BYTES = 18 * 1024 * 1024;
+    const state = { papers: [], active: -1, lastMap: null };
+
+    const $ = (id) => document.getElementById(id);
+
+    const dictionaries = {
+      MD: {
+        randomized: 'A study design that assigns people to groups by chance.',
+        cohort: 'A group of people followed over time.',
+        endpoint: 'The health result measured by a study.',
+        'hazard ratio': 'A comparison of how often an event happens over time.',
+        'confidence interval': 'A range showing uncertainty around a result.',
+        placebo: 'An inactive treatment used for comparison.',
+        'adverse event': 'An unwanted health effect during a study.',
+        biomarker: 'A measurable sign of a body process or disease.',
+        metastasis: 'Cancer spreading to another body part.',
+        comorbidity: 'Another health condition a patient has.'
+      },
+      AI: {
+        transformer: 'A neural network design that focuses on relationships between tokens.',
+        attention: 'A method that helps a model focus on relevant parts of input.',
+        embedding: 'A numeric representation of text, images, or other data.',
+        gradient: 'A signal that tells a model how to adjust during learning.',
+        'loss function': 'A score showing how wrong a model is.',
+        benchmark: 'A standard test used to compare systems.',
+        'fine-tuning': 'Training an existing model on a more specific dataset.',
+        'reinforcement learning': 'Learning by rewards and penalties.',
+        dataset: 'A collection of examples used for training or evaluation.',
+        parameter: 'A learned internal value of a model.'
+      }
+    };
+
+    const i18n = {
+      English: 'Respond in clear English.',
+      Arabic: 'Respond in Arabic. Use right-to-left friendly formatting.',
+      French: 'Respond in French.',
+      Amharic: 'Respond in Amharic.',
+      Chinese: 'Respond in Simplified Chinese.'
+    };
+
+    function safeName(name) {
+      return name.replace(/\.pdf$/i, '').replace(/[_-]+/g, ' ').slice(0, 90);
+    }
+
+    function addMsg(text, kind = 'bot') {
+      const msg = document.createElement('div');
+      msg.className = `msg ${kind}`;
+      if ($('lang').value === 'Arabic') msg.classList.add('rtl');
+      msg.textContent = text;
+      $('chatTab').appendChild(msg);
+      $('chatTab').scrollTop = $('chatTab').scrollHeight;
+    }
+
+    function setStatus(kind, text) {
+      $('statusDot').className = `dot ${kind || ''}`;
+      $('statusText').textContent = text;
+    }
+
+    function setTrace(items) {
+      $('trace').innerHTML = items.map((item) => `<li>${escapeHtml(item)}</li>`).join('');
+    }
+
+    function escapeHtml(text) {
+      return String(text).replace(/[&<>"]/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[char]));
+    }
+
+    function selectedPapers() {
+      return state.papers.filter((paper) => paper.selected);
+    }
+
+    function currentPaperArray() {
+      return state.active >= 0 ? [state.papers[state.active]] : [];
+    }
+
+    function selectedBytes() {
+      return selectedPapers().reduce((sum, paper) => sum + paper.size, 0);
+    }
+
+    function updateRequestSize() {
+      const mb = selectedBytes() / 1024 / 1024;
+      $('requestSize').textContent = `Selected PDF payload: ${mb.toFixed(1)} MB`;
+      if (selectedBytes() > MAX_INLINE_REQUEST_BYTES) {
+        $('requestSize').textContent += ' — too large for this inline MVP; select fewer or smaller PDFs.';
+      }
+    }
+
+    function bytesToBase64(bytes) {
+      let binary = '';
+      const chunkSize = 0x8000;
+      for (let i = 0; i < bytes.length; i += chunkSize) {
+        binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunkSize));
+      }
+      return btoa(binary);
+    }
+
+    async function makePaper(file) {
+      const buffer = await file.arrayBuffer();
+      const bytes = new Uint8Array(buffer);
+      let glimpse = '';
+
+      for (let i = 0; i < Math.min(bytes.length, 90000); i++) {
+        const char = bytes[i];
+        glimpse += (char >= 32 && char <= 126) || char === 10 || char === 13 ? String.fromCharCode(char) : ' ';
+      }
+
+      return {
+        name: file.name,
+        file,
+        url: URL.createObjectURL(file),
+        base64: bytesToBase64(bytes),
+        size: file.size,
+        selected: true,
+        domain: $('domain').value,
+        page: 1,
+        glimpse: glimpse.replace(/\s+/g, ' ').slice(0, 6000)
+      };
+    }
+
+    async function handleFiles(files) {
+      let added = 0;
+      for (const file of [...files]) {
+        const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
+        if (!isPdf) continue;
+        state.papers.push(await makePaper(file));
+        added++;
+      }
+
+      if (state.active < 0 && state.papers.length) openPaper(0);
+      renderPapers();
+      updateRequestSize();
+      if (added) addMsg(`Loaded ${added} PDF(s). Select papers for multi-document Q&A, or use Ask current for the visible paper only.`, 'system');
+    }
+
+    function renderPapers() {
+      const query = $('paperSearch').value.toLowerCase();
+      $('paperList').innerHTML = '';
+
+      state.papers.forEach((paper, index) => {
+        if (!paper.name.toLowerCase().includes(query)) return;
+        const card = document.createElement('div');
+        card.className = `paper ${index === state.active ? 'active' : ''}`;
+        card.innerHTML = `
+          <div class="row">
+            <input type="checkbox" ${paper.selected ? 'checked' : ''} data-select="${index}" aria-label="Select ${escapeHtml(safeName(paper.name))} for chat" />
+            <button data-open="${index}">
+              <div class="paper-title">${escapeHtml(safeName(paper.name))}</div>
+              <div class="tiny">${(paper.size / 1024 / 1024).toFixed(1)} MB · ${paper.domain}</div>
+            </button>
+          </div>`;
+        $('paperList').appendChild(card);
+      });
+    }
+
+    function pdfUrlWithPage(paper) {
+      return `${paper.url}#page=${paper.page || 1}&toolbar=1&navpanes=1&view=FitH`;
+    }
+
+    function refreshViewerPage() {
+      if (state.active < 0) return;
+      const paper = state.papers[state.active];
+      $('pageNum').value = paper.page || 1;
+      const frame = $('pdfFrame');
+      if (frame) frame.src = pdfUrlWithPage(paper);
+    }
+
+    function openPaper(index) {
+      state.active = index;
+      const paper = state.papers[index];
+      $('viewerTitle').textContent = safeName(paper.name);
+      $('viewerMeta').textContent = `${paper.domain} · selected for chat: ${paper.selected ? 'yes' : 'no'} · ${(paper.size / 1024 / 1024).toFixed(1)} MB`;
+      $('pageNum').value = paper.page || 1;
+      $('viewerPane').innerHTML = `<iframe id="pdfFrame" title="PDF viewer" src="${pdfUrlWithPage(paper)}"></iframe>`;
+      renderPapers();
+    }
+
+    function pageStep(delta) {
+      if (state.active < 0) return;
+      const paper = state.papers[state.active];
+      paper.page = Math.max(1, Number(paper.page || 1) + delta);
+      refreshViewerPage();
+    }
+
+    function pdfParts(papers) {
+      const parts = [];
+      papers.forEach((paper, index) => {
+        parts.push({ text: `Document ${index + 1}: ${paper.name}` });
+        parts.push({ inline_data: { mime_type: 'application/pdf', data: paper.base64 } });
+      });
+      return parts;
+    }
+
+    async function callGemini(text, papers = []) {
+      const key = $('apiKey').value.trim();
+      if (!key) throw new Error('Missing Gemini API key');
+
+      const totalBytes = papers.reduce((sum, paper) => sum + paper.size, 0);
+      if (totalBytes > MAX_INLINE_REQUEST_BYTES) {
+        throw new Error('Selected PDFs are too large for this dependency-free inline request. Select fewer/smaller PDFs or use a backend/File API in production.');
+      }
+
+      const body = {
+        systemInstruction: {
+          parts: [{
+            text: 'You are arXivGPT, a careful research paper explainer. When PDFs are supplied, answer from the PDFs first and cite document name plus page number whenever visible or inferable. If the answer is not found in the documents, say so, then provide a clearly labelled Agentic fallback general explanation. For medicine, provide education only and avoid diagnosis or treatment instructions.'
+          }]
+        },
+        contents: [{ parts: [...pdfParts(papers), { text }] }],
+        generationConfig: { temperature: 0.2, maxOutputTokens: 3200 }
+      };
+
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${encodeURIComponent(key)}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+
+      if (!response.ok) throw new Error(await response.text());
+      const data = await response.json();
+      return data.candidates?.[0]?.content?.parts?.map((part) => part.text).join('\n') || 'No response text returned.';
+    }
+
+    function localAnswer(question, general = false) {
+      const context = selectedPapers().map((paper) => `### ${paper.name}\n${paper.glimpse}`).join('\n');
+      if (!context && !general) return 'Please upload and select at least one PDF first.';
+
+      const hits = [];
+      question.toLowerCase().split(/\W+/).filter((word) => word.length > 4).forEach((word) => {
+        const match = context.match(new RegExp(`.{0,90}${word}.{0,140}`, 'i'));
+        if (match) hits.push(match[0]);
+      });
+
+      if (hits.length) {
+        return `Local fallback found possible raw-text matches, but reliable PDF understanding requires Gemini PDF-native mode.\n\n${hits.slice(0, 3).map((hit) => '• ' + hit.trim()).join('\n')}\n\nAdd or test a Gemini key, then ask again.`;
+      }
+
+      return general
+        ? 'Agentic fallback: I cannot confirm this from the uploaded PDFs without a working Gemini key, so only a general explanation can be provided.'
+        : 'I could not read enough document evidence locally. Please use a Gemini key so the app can send the actual PDFs to Gemini.';
+    }
+
+    function renderConceptMap(map) {
+      const nodes = Array.isArray(map.nodes) ? map.nodes.slice(0, 10) : [];
+      const center = map.central_topic || map.title || 'Document concept map';
+      const cx = 280;
+      const cy = 190;
+      const radius = 135;
+      const positions = nodes.map((node, index) => {
+        const angle = (Math.PI * 2 * index / Math.max(nodes.length, 1)) - Math.PI / 2;
+        return {
+          node,
+          x: cx + radius * Math.cos(angle),
+          y: cy + radius * Math.sin(angle)
+        };
+      });
+
+      const edges = positions.map((position) => `<line class="map-edge" x1="${cx}" y1="${cy}" x2="${position.x}" y2="${position.y}" />`).join('');
+      const nodeSvg = positions.map((position) => {
+        const label = escapeHtml(String(position.node.label || position.node.name || 'Concept').slice(0, 34));
+        const type = escapeHtml(String(position.node.type || '').slice(0, 22));
+        return `
+          <g>
+            <rect class="map-node" x="${position.x - 70}" y="${position.y - 28}" width="140" height="56" rx="16"></rect>
+            <text class="map-text" x="${position.x}" y="${position.y - 3}" text-anchor="middle">${label}</text>
+            <text class="map-text" x="${position.x}" y="${position.y + 15}" text-anchor="middle" opacity="0.7">${type}</text>
+          </g>`;
+      }).join('');
+
+      $('mapWrap').innerHTML = `
+        <svg class="map-svg" viewBox="0 0 560 380" role="img" aria-label="Concept map">
+          ${edges}
+          <circle class="map-center" cx="${cx}" cy="${cy}" r="64"></circle>
+          <text class="map-center-text" x="${cx}" y="${cy - 5}" text-anchor="middle">${escapeHtml(String(center).slice(0, 28))}</text>
+          <text class="map-center-text" x="${cx}" y="${cy + 14}" text-anchor="middle" opacity="0.85">Concept Map</text>
+          ${nodeSvg}
+        </svg>
+        <p class="tiny">${escapeHtml(map.summary || 'Concept map generated from the selected document context.')}</p>`;
+    }
+
+    function parseJsonLoose(text) {
+      const fenced = text.match(/```json\s*([\s\S]*?)```/i) || text.match(/```\s*([\s\S]*?)```/i);
+      const body = fenced ? fenced[1] : text;
+      const start = body.indexOf('{');
+      const end = body.lastIndexOf('}');
+      if (start < 0 || end < start) throw new Error('No JSON object returned.');
+      return JSON.parse(body.slice(start, end + 1));
+    }
+
+    async function askWithPapers(question, papers, label) {
+      addMsg(`${label}: ${question}`, 'user');
+      if (!papers.length) return addMsg('Please upload and select/open at least one PDF.', 'system');
+
+      const names = papers.map((paper) => paper.name).join(', ');
+      setTrace([
+        `${label} started`,
+        `Documents in scope: ${names}`,
+        `Domain mode: ${$('domain').value}; language: ${$('lang').value}`,
+        'Gemini receives PDF files as inline document data',
+        'Answer is instructed to cite pages and use fallback only when evidence is missing'
+      ]);
+
+      const prompt = `Language: ${$('lang').value}. ${i18n[$('lang').value]}\nDomain mode: ${$('domain').value}.\nQuestion: ${question}\n\nAnswer with: 1) direct answer, 2) evidence bullets with document names and page references, 3) beginner explanation, 4) uncertainty/limitations. If not found in the PDFs, say not found and then provide Agentic fallback.`;
+
+      try {
+        setStatus('warn', 'Gemini reading PDFs…');
+        addMsg(await callGemini(prompt, papers));
+        setStatus('ok', 'Gemini connected');
+      } catch (error) {
+        setStatus('', 'Local fallback');
+        addMsg(`${localAnswer(question)}\n\nError: ${error.message}`);
+      }
+    }
+
+    $('drop').addEventListener('click', (event) => {
+      if (event.target.id !== 'fileInput') $('fileInput').click();
+    });
+
+    $('drop').addEventListener('keydown', (event) => {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        $('fileInput').click();
+      }
+    });
+
+    $('fileInput').addEventListener('change', (event) => handleFiles(event.target.files));
+
+    ['dragenter', 'dragover'].forEach((eventName) => {
+      $('drop').addEventListener(eventName, (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        $('drop').classList.add('drag');
+      });
+    });
+
+    ['dragleave', 'drop'].forEach((eventName) => {
+      $('drop').addEventListener(eventName, (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        $('drop').classList.remove('drag');
+      });
+    });
+
+    $('drop').addEventListener('drop', (event) => handleFiles(event.dataTransfer.files));
+    window.addEventListener('dragover', (event) => event.preventDefault());
+    window.addEventListener('drop', (event) => event.preventDefault());
+
+    $('paperList').addEventListener('click', (event) => {
+      const selector = event.target.closest('[data-select]');
+      const opener = event.target.closest('[data-open]');
+      if (selector) {
+        state.papers[Number(selector.dataset.select)].selected = selector.checked;
+        renderPapers();
+        updateRequestSize();
+      }
+      if (opener) openPaper(Number(opener.dataset.open));
+    });
+
+    $('selectAll').addEventListener('change', (event) => {
+      state.papers.forEach((paper) => { paper.selected = event.target.checked; });
+      renderPapers();
+      updateRequestSize();
+    });
+
+    $('clearBtn').addEventListener('click', () => {
+      state.papers.forEach((paper) => URL.revokeObjectURL(paper.url));
+      state.papers = [];
+      state.active = -1;
+      state.lastMap = null;
+      $('paperList').innerHTML = '';
+      $('viewerTitle').textContent = 'No paper selected';
+      $('viewerMeta').textContent = 'Upload a PDF to begin';
+      $('viewerPane').innerHTML = '<div class="empty"><div><h2>Minimal paper reader</h2><p>Select a PDF on the left.</p></div></div>';
+      $('mapWrap').innerHTML = '<p class="tiny">Generate a concept map from the selected or current PDF.</p>';
+      updateRequestSize();
+    });
+
+    $('paperSearch').addEventListener('input', renderPapers);
+    $('theme').addEventListener('change', (event) => { document.body.dataset.theme = event.target.value; });
+    $('demoPrompt').addEventListener('change', (event) => { if (event.target.value) $('question').value = event.target.value; });
+
+    $('prevPaperBtn').addEventListener('click', () => {
+      if (state.papers.length) openPaper(Math.max(0, state.active - 1));
+    });
+
+    $('nextPaperBtn').addEventListener('click', () => {
+      if (state.papers.length) openPaper(Math.min(state.papers.length - 1, state.active + 1));
+    });
+
+    $('pagePrevBtn').addEventListener('click', () => pageStep(-1));
+    $('pageNextBtn').addEventListener('click', () => pageStep(1));
+
+    $('pageNum').addEventListener('change', () => {
+      if (state.active < 0) return;
+      state.papers[state.active].page = Math.max(1, Number($('pageNum').value || 1));
+      refreshViewerPage();
+    });
+
+    $('openTabBtn').addEventListener('click', () => {
+      if (state.active >= 0) window.open(pdfUrlWithPage(state.papers[state.active]), '_blank', 'noopener');
+    });
+
+    document.querySelectorAll('.tab').forEach((button) => {
+      button.addEventListener('click', () => {
+        document.querySelectorAll('.tab').forEach((tab) => tab.classList.remove('on'));
+        document.querySelectorAll('.tabpane').forEach((pane) => { pane.style.display = 'none'; });
+        button.classList.add('on');
+        $(button.dataset.tab).style.display = button.dataset.tab === 'chatTab' ? 'flex' : 'block';
+      });
+    });
+
+    $('testKey').addEventListener('click', async () => {
+      try {
+        setStatus('warn', 'Testing…');
+        setTrace(['Testing Gemini connection', 'Sending a minimal text-only prompt to Gemini 2.5 Flash']);
+        await callGemini('Reply with exactly: connected');
+        setStatus('ok', 'Gemini connected');
+      } catch (error) {
+        setStatus('', 'Connection failed');
+        addMsg(`Connection test failed: ${error.message}`, 'system');
+      }
+    });
+
+    $('askBtn').addEventListener('click', () => {
+      const question = $('question').value.trim();
+      if (!question) return;
+      askWithPapers(question, selectedPapers(), 'Ask selected papers');
+    });
+
+    $('askCurrentBtn').addEventListener('click', () => {
+      const question = $('question').value.trim();
+      if (!question) return;
+      askWithPapers(question, currentPaperArray(), 'Ask current paper');
+    });
+
+    $('fallbackBtn').addEventListener('click', async () => {
+      const question = $('question').value.trim() || 'Explain this topic simply.';
+      addMsg(`${question} (general fallback)`, 'user');
+      setTrace(['General explanation requested', 'No PDF evidence required', 'Response is clearly labelled as fallback/background knowledge']);
+      try {
+        addMsg(await callGemini(`Language: ${$('lang').value}. ${i18n[$('lang').value]} Provide a beginner-friendly general explanation, clearly labelled Agentic fallback, for: ${question}`, []));
+      } catch (error) {
+        addMsg(`${localAnswer(question, true)}\n\nError: ${error.message}`);
+      }
+    });
+
+    $('summBtn').addEventListener('click', async () => {
+      if (state.active < 0) return addMsg('Select a paper first.', 'system');
+      const paper = state.papers[state.active];
+      addMsg(`Simplify: ${paper.name}`, 'user');
+      setTrace(['One-click simplification started', `Current document: ${paper.name}`, 'Gemini is asked for beginner-friendly summary with page citations']);
+
+      const prompt = `${i18n[$('lang').value]} Simplify this ${$('domain').value} paper for beginners. Include: 1) one-sentence takeaway, 2) why it matters, 3) methods in plain language, 4) key findings with page citations, 5) limitations, 6) short glossary. Use the PDF itself, not raw encoded text.`;
+
+      try {
+        setStatus('warn', 'Gemini reading PDF…');
+        addMsg(await callGemini(prompt, [paper]));
+        setStatus('ok', 'Gemini connected');
+      } catch (error) {
+        setStatus('', 'Local fallback');
+        addMsg(`Could not run PDF-native summary. Add/test a Gemini key.\n\nError: ${error.message}`);
+      }
+    });
+
+    $('glossBtn').addEventListener('click', async () => {
+      const papers = selectedPapers();
+      $('glossary').innerHTML = '<p class="tiny">Generating…</p>';
+      setTrace(['Glossary extraction started', `${papers.length} selected document(s)`, 'Gemini extracts beginner-friendly definitions and page evidence where possible']);
+      try {
+        const answer = await callGemini(`${i18n[$('lang').value]} Extract 12-20 domain-specific glossary terms from the supplied PDFs. For each term give: term, beginner definition, document/page cite if visible. Domain ${$('domain').value}.`, papers);
+        $('glossary').innerHTML = `<dd style="white-space: pre-wrap;">${escapeHtml(answer)}</dd>`;
+      } catch (error) {
+        const context = papers.map((paper) => paper.glimpse.toLowerCase()).join(' ');
+        const terms = dictionaries[$('domain').value];
+        let html = '';
+        Object.entries(terms).forEach(([term, definition]) => {
+          const count = (context.match(new RegExp(term, 'g')) || []).length;
+          if (count) html += `<dt>${escapeHtml(term)} <span class="pill">${count}</span></dt><dd>${escapeHtml(definition)}</dd>`;
+        });
+        $('glossary').innerHTML = html || '<p class="tiny">No local glossary terms detected. Connect Gemini for PDF-native extraction.</p>';
+      }
+    });
+
+    $('citeBtn').addEventListener('click', async () => {
+      if (state.active < 0) return;
+      const paper = state.papers[state.active];
+      $('refs').innerHTML = '<li class="tiny">Extracting…</li>';
+      setTrace(['Citation tracker started', `Current document: ${paper.name}`, 'Gemini is asked to identify bibliography items and in-text links where possible']);
+      try {
+        const answer = await callGemini(`${i18n[$('lang').value]} Find the bibliography/references in this PDF. Return numbered references and, where possible, mention pages/sections in the paper that cite them.`, [paper]);
+        $('refs').innerHTML = `<li style="white-space: pre-wrap;">${escapeHtml(answer)}</li>`;
+      } catch (error) {
+        $('refs').innerHTML = '<li class="tiny">Connect Gemini to extract references from the actual PDF. Local raw extraction is not reliable.</li>';
+      }
+    });
+
+    $('mapBtn').addEventListener('click', async () => {
+      const papers = selectedPapers().length ? selectedPapers() : currentPaperArray();
+      if (!papers.length) return;
+      $('mapWrap').innerHTML = '<p class="tiny">Generating concept map…</p>';
+      setTrace(['Concept map agent started', `${papers.length} document(s) in scope`, 'Gemini extracts central topic, concepts, relationship types, and a short summary', 'The app renders the result as a lightweight SVG mind map']);
+
+      const prompt = `${i18n[$('lang').value]} Create a beginner-friendly concept map from the supplied PDF(s). Return only valid JSON with this schema: {"central_topic":"short topic","summary":"one sentence","nodes":[{"label":"concept","type":"method|finding|term|limitation|application|evidence"}],"edges":[{"from":"central_topic or concept","to":"concept","relation":"short relationship"}]}. Use 6 to 10 nodes. Domain ${$('domain').value}.`;
+
+      try {
+        const answer = await callGemini(prompt, papers);
+        const map = parseJsonLoose(answer);
+        state.lastMap = map;
+        renderConceptMap(map);
+      } catch (error) {
+        $('mapWrap').innerHTML = `<p class="tiny">Could not render a structured map. Error: ${escapeHtml(error.message)}</p>`;
+      }
+    });
+
+    $('copyMapBtn').addEventListener('click', async () => {
+      if (!state.lastMap) return;
+      await navigator.clipboard.writeText(JSON.stringify(state.lastMap, null, 2));
+      addMsg('Concept map JSON copied to clipboard.', 'system');
+    });
+
+    addMsg('Welcome to arXivGPT MVP v328. This final submission version adds clear current-vs-selected paper querying, demo prompts, a visible agent workflow, PDF page navigation, and a lightweight concept map agent while keeping the MVP focused.', 'system');
+    setTrace([
+      'Upload one or more PDFs',
+      'Select papers for multi-document Q&A or open one paper for current-paper Q&A',
+      'Gemini 2.5 Flash receives PDFs as inline document data when an API key is connected',
+      'The assistant answers with citations where visible and falls back only when evidence is missing',
+      'Glossary, citations, and concept map are generated as focused research assistant tools'
+    ]);
+    updateRequestSize();
+  </script>
+</body>
+</html>
